@@ -1,0 +1,649 @@
+{
+  "name": "My workflow 39",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3336a559-3e9d-4e82-86c5-57bc39340289",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://www.searchapi.io/api/v1/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "engine",
+              "value": "google"
+            },
+            {
+              "name": "q",
+              "value": "{{$json.query}}"
+            },
+            {
+              "name": "api_key",
+              "value": "6td2Krtq6BbrG3aNdZjFVeTs"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "a098d9cc-47f4-4493-bf99-16d50f082783",
+      "name": "Fetch Leads"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allResults = [];\n\nfor (const item of items) {\n  const results = item.json.organic_results || [];\n  const searchQuery = item.json.search_parameters?.q || item.json.query || \"Unknown\";\n\n  for (const result of results) {\n    allResults.push({\n      json: {\n        company: result.title || \"Unknown\",\n        website: result.link || \"\",\n        industry_source: searchQuery,\n        location: \"India\",\n        description: result.snippet || \"\",\n        source: \"SerpApi\"\n      }\n    });\n  }\n}\n\nreturn allResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "9df7f10d-884e-434d-994c-9402c81d4127",
+      "name": "Clean Lead Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let website = item.json.website || \"\";\n\n  let domain = website\n    .replace(\"https://\", \"\")\n    .replace(\"http://\", \"\")\n    .replace(\"www.\", \"\")\n    .split(\"/\")[0]\n    .trim();\n\n  return {\n    json: {\n      ...item.json,\n      domain\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "c4c5d481-5188-4767-aeda-82cfcf37ebc5",
+      "name": "Extract Domain"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2cb82730-a840-45e4-94c1-1c78e6e6a9fb",
+              "leftValue": "={{ $json.domain }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "0b70c742-dc13-4710-ab5c-ea67f544baf9",
+              "leftValue": "={{ $json.website }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "2c768bd1-f7ea-4988-9524-b7bdf1ac4b2d",
+      "name": "Filter Valid Leads"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let score = 0;\n\n  const text = `${item.json.company} ${item.json.description} ${item.json.industry_source}`.toLowerCase();\n\n  if (text.includes(\"school\")) score += 30;\n  if (text.includes(\"college\")) score += 30;\n  if (text.includes(\"university\")) score += 30;\n  if (text.includes(\"hospital\")) score += 30;\n  if (text.includes(\"clinic\")) score += 25;\n  if (text.includes(\"construction\")) score += 25;\n  if (text.includes(\"logistics\")) score += 25;\n  if (text.includes(\"transport\")) score += 25;\n\n  if (text.includes(\"admission\")) score += 20;\n  if (text.includes(\"registration\")) score += 20;\n  if (text.includes(\"application\")) score += 15;\n  if (text.includes(\"contact\")) score += 10;\n\n  let quality = \"Low\";\n  if (score >= 60) quality = \"High\";\n  else if (score >= 35) quality = \"Medium\";\n\n  return {\n    json: {\n      ...item.json,\n      lead_score: score,\n      lead_quality: quality\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "ca4c9da1-b5c9-458a-a408-187135ec2612",
+      "name": "Lead Scoring"
+    },
+    {
+      "parameters": {
+        "url": "https://api.hunter.io/v2/domain-search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.domain }}"
+            },
+            {
+              "name": "api_key",
+              "value": "042783f99a30acc88de8103ec994ab15de83154c"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1664,
+        0
+      ],
+      "id": "843a70d0-6de9-4cd7-ad24-8e7bb3cec71a",
+      "name": "Hunter Email Search"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const emails = item.json.data?.emails || [];\n\n  let email = \"Not Found\";\n  let emailType = \"Not Found\";\n  let confidence = \"Not Found\";\n\n  if (emails.length > 0) {\n    const genericEmail = emails.find(e => e.type === \"generic\");\n    const selectedEmail = genericEmail || emails[0];\n\n    email = selectedEmail.value || \"Not Found\";\n    emailType = selectedEmail.type || \"Not Found\";\n    confidence = selectedEmail.confidence || \"Not Found\";\n  }\n\n  return {\n    json: {\n      company_email: email,\n      email_type: emailType,\n      email_confidence: confidence\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        0
+      ],
+      "id": "b4c67dbf-e23e-401e-8b77-e683eae410a2",
+      "name": "Extract Company Email"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2240,
+        16
+      ],
+      "id": "0a899578-e873-4527-961a-ed2efa9077c0",
+      "name": "Merge Lead With Email"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.website}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2448,
+        16
+      ],
+      "id": "d6559a92-0290-4b4d-b70d-752725eb0c5f",
+      "name": "Fetch Contact Page"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const html = typeof item.json === \"string\"\n    ? item.json\n    : JSON.stringify(item.json);\n\n  const phoneRegex = /(\\+?\\d[\\d\\s\\-().]{8,18})/g;\n  const matches = html.match(phoneRegex) || [];\n\n  let phone = \"Not Found\";\n\n  if (matches.length > 0) {\n    phone = matches[0].replace(/\\s+/g, \" \").trim();\n  }\n\n  return {\n    json: {\n      company_phone: phone\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2656,
+        16
+      ],
+      "id": "87d479cd-9164-4d17-8ada-f795247f4f23",
+      "name": "Extract Phone Number"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2864,
+        16
+      ],
+      "id": "1f162dba-b5ce-45c8-94fe-3a9cde697d27",
+      "name": "Merge Final Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  return {\n    json: {\n      company: item.json.company || \"Unknown\",\n      website: item.json.website || \"Not Found\",\n      domain: item.json.domain || \"Not Found\",\n      industry: item.json.industry || \"Unknown\",\n      location: item.json.location || \"Unknown\",\n      description: item.json.description || \"\",\n\n      company_email: item.json.company_email || \"Not Found\",\n      email_type: item.json.email_type || \"Not Found\",\n      email_confidence: item.json.email_confidence || \"Not Found\",\n\n      company_phone: item.json.company_phone || \"Not Found\",\n\n      lead_score: item.json.lead_score || 0,\n      lead_quality: item.json.lead_quality || \"Low\",\n\n      created_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        16
+      ],
+      "id": "2bb8fd28-9a85-47d7-9c05-60f5730ec42e",
+      "name": "Final Format"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1I7fHliY64MV4hZh-4YiUux3mgL-9HhIGRY_yhLg7kBw",
+          "mode": "list",
+          "cachedResultName": "form director",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I7fHliY64MV4hZh-4YiUux3mgL-9HhIGRY_yhLg7kBw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I7fHliY64MV4hZh-4YiUux3mgL-9HhIGRY_yhLg7kBw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "domain": "={{ $json.domain }}",
+            "industry": "={{ $json.industry }}",
+            "Company": "={{ $json.company }}",
+            "Website": "={{ $json.website }}",
+            "Location": "={{ $json.location }}",
+            "Description": "={{ $json.description }}",
+            "Company Email": "={{ $json.company_email }}",
+            "Email Type": "={{ $json.email_type }}",
+            "Email Confidence": "={{ $json.email_confidence }}",
+            "Company Phone": "={{ $json.company_phone }}",
+            "Lead Score": "={{ $json.lead_score }}",
+            "Lead Quality": "={{ $json.lead_quality }}",
+            "Created At": "={{ $json.created_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Website",
+              "displayName": "Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "domain",
+              "displayName": "domain",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "industry",
+              "displayName": "industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company Email",
+              "displayName": "Company Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email Type",
+              "displayName": "Email Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email Confidence",
+              "displayName": "Email Confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company Phone",
+              "displayName": "Company Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Lead Score",
+              "displayName": "Lead Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Lead Quality",
+              "displayName": "Lead Quality",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3280,
+        16
+      ],
+      "id": "e0518a5d-3422-4ffa-acda-0ea42fb4f056",
+      "name": "Save Leads",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0FDqL6W0CCg2Xzcd",
+          "name": "Google Sheets account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { query: \"schools in Bangalore official website contact email phone\" } },\n  { json: { query: \"colleges in Karnataka official website admission contact\" } },\n  { json: { query: \"hospitals in Bangalore official website contact email\" } },\n  { json: { query: \"clinics in Karnataka official website contact\" } },\n  { json: { query: \"construction companies Bangalore official website contact\" } },\n  { json: { query: \"logistics companies Bangalore official website contact\" } },\n  { json: { query: \"transport companies Karnataka official website contact\" } }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "07215366-5914-4512-ade0-51edb1335fd8",
+      "name": "Generate Queries"
+    },
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1456,
+        0
+      ],
+      "id": "85115ae6-3f70-409c-a0d9-fb0fab5cd3cd",
+      "name": "Limit"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Leads": {
+      "main": [
+        [
+          {
+            "node": "Clean Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Extract Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Domain": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Leads": {
+      "main": [
+        [
+          {
+            "node": "Lead Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Scoring": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead With Email",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hunter Email Search": {
+      "main": [
+        [
+          {
+            "node": "Extract Company Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Company Email": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead With Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Lead With Email": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contact Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Final Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch Contact Page": {
+      "main": [
+        [
+          {
+            "node": "Extract Phone Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Phone Number": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Final Data": {
+      "main": [
+        [
+          {
+            "node": "Final Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Format": {
+      "main": [
+        [
+          {
+            "node": "Save Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Queries": {
+      "main": [
+        [
+          {
+            "node": "Fetch Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Hunter Email Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "612b8099-9bca-4cbf-ae8a-c860be69b860",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5a064eab1f268946bc007c4172b2fb6debef9dbda2a90313cc0c931db4dbf7e6"
+  },
+  "id": "JrGGQdeT138ituKJ",
+  "tags": []
+}
